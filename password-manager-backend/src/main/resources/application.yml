@@ -1,0 +1,77 @@
+spring:
+  application:
+    name: SafeKeyManager
+
+---
+spring:
+  config:
+    activate:
+      on-profile: dev
+  datasource:
+    url: jdbc:h2:mem:safekeymanager;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+app:
+  jwt:
+    secret: "dev-safekeymanager-secret-key-must-be-at-least-64-chars-for-hs512-padding-here"
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+  cors:
+    allowed-origins: "http://localhost:3000,http://localhost:8080,http://127.0.0.1:5500,http://127.0.0.1:3000"
+  rate-limit:
+    auth-max-requests: 5
+    auth-window-seconds: 60
+
+---
+spring:
+  config:
+    activate:
+      on-profile: prod
+  datasource:
+    url: ${DATABASE_URL}
+    username: ${DATABASE_USERNAME}
+    password: ${DATABASE_PASSWORD}
+  jpa:
+    database-platform: org.hibernate.dialect.PostgreSQLDialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${PORT:8080}
+  ssl:
+    enabled: ${SSL_ENABLED:false}
+    key-store: ${SSL_KEY_STORE:}
+    key-store-password: ${SSL_KEY_STORE_PASSWORD:}
+    key-store-type: PKCS12
+
+app:
+  jwt:
+    secret: ${JWT_SECRET}
+    access-token-expiry-ms: 900000
+    refresh-token-expiry-ms: 604800000
+  cors:
+    allowed-origins: ${ALLOWED_ORIGINS}
+  rate-limit:
+    auth-max-requests: 5
+    auth-window-seconds: 60

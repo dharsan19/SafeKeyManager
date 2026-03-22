@@ -1,0 +1,75 @@
+version: '3.9'
+
+services:
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: safekeymanager-db
+    environment:
+      POSTGRES_DB: safekeymanager
+      POSTGRES_USER: ${POSTGRES_USER:-skm_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-skm_user} -d safekeymanager"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    networks:
+      - skm-net
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./password-manager-backend
+      dockerfile: Dockerfile
+    container_name: safekeymanager-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DATABASE_URL: jdbc:postgresql://postgres:5432/safekeymanager
+      DATABASE_USERNAME: ${POSTGRES_USER:-skm_user}
+      DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-change_me_in_production}
+      JWT_SECRET: ${JWT_SECRET:-CHANGE-ME-generate-a-random-64-char-string-here-for-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:3000}
+      PORT: 8080
+    ports:
+      - "8080:8080"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - skm-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:8080/actuator/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  frontend:
+    image: nginx:1.25-alpine
+    container_name: safekeymanager-frontend
+    volumes:
+      - ./password-manager-frontend:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - skm-net
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+
+networks:
+  skm-net:
+    driver: bridge
